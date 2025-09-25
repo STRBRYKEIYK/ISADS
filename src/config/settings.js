@@ -3,65 +3,84 @@
  */
 
 module.exports = {
-  // Search Engine Settings
+  // Search Engine Settings - BRAND WEBSITE PRIORITY
   search: {
-    engines: ['amazon', 'google', 'bing'], // Only fastest, most reliable engines
-    maxImagesPerItem: 6, // Reduced for faster processing
-    searchTimeout: 30000, // Reduced to 30 seconds for faster processing
-    retryAttempts: 2, // Reduced retries for speed
-    delayBetweenRequests: 1000, // Reduced to 1 second for speed
-    delayBetweenEngines: 500, // Reduced to 0.5 seconds for speed
+    // PRIORITY ORDER: 1. Official Brand Websites, 2. Google, 3. Bing, 4. Amazon
+    engines: ['google', 'bing', 'amazon'], // Fallback engines after brand websites
+    maxImagesPerItem: 8, // Allow more images for better selection
+    searchTimeout: 20000, // Allow time for quality results
+    retryAttempts: 2, // More retries for valuable results
+    delayBetweenRequests: 300, // Prevent rate limiting
+    delayBetweenEngines: 200, // Allow proper cooldown between engines
     userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
     
-    // Anti-detection settings
+    // Brand Website Settings - HIGHEST PRIORITY
+    prioritizeBrandWebsites: true, // Always check brand websites first
+    brandWebsiteTimeout: 15000, // Timeout for brand website scraping
+    brandWebsiteRetries: 2, // Retries for brand websites
+    skipFallbackIfBrandFound: true, // Skip other engines if enough brand images found
+    
+    // Anti-detection settings - Enhanced for all sources
     enableUserAgentRotation: true,
     randomizeViewport: true,
     simulateHumanBehavior: true,
     
-    // Selector timeouts
-    selectorTimeout: 10000, // Reduced to 10 seconds for speed
-    maxSelectorRetries: 2, // Reduced retries for speed
+    // Selector timeouts - Balanced for quality results
+    selectorTimeout: 8000, // Time for dynamic loading
+    maxSelectorRetries: 2, // Retries for valuable results
     
-    // Performance optimizations
-    concurrentSearches: 2, // Allow some concurrent searches
-    skipSlowEngines: true // Skip engines that consistently timeout
+    // Performance optimizations - QUALITY OVER SPEED
+    concurrentSearches: 2, // Avoid rate limiting
+    skipSlowEngines: false, // Don't skip - we want quality results
+    fastFailMode: false, // Patience for high-quality results
+    
+    // QUALITY FILTERING - Prioritize professional sources
+    preferredDomains: [
+      'harriswelding.com', 'lincolnelectric.com', 'hypertherm.com', 
+      '3m.com', 'garlock.com', 'apple.com', 'mi.com', 
+      'jollibee.com', 'popeyes.com'
+    ],
+    avoidDomains: ['pinterest', 'facebook', 'twitter', 'instagram'], // Avoid social media
+    requireProductPages: true // Prefer actual product pages over generic images
   },
 
-  // Image Quality Requirements - Updated dimensions
+  // Image Quality Requirements - HIGHEST QUALITY ONLY
   quality: {
-    // Image size requirements: 600x600 to 1200x1200
-    minResolution: [600, 600],
-    maxResolution: [1200, 1200],
-    // Near-square aspect ratio window used by helpers/tests
-    preferredAspectRatio: [0.8, 1.25], // Prefer near-square images
-    strictSquareOnly: false, // Accept slightly non-square images
+    // HIGHEST QUALITY: 800x800 to 1200x1200 for maximum sharpness
+    minResolution: [800, 800], // Increased to 800px minimum for crisp images
+    maxResolution: [1200, 1200], // Keep 1200px max for optimal quality
+    // Perfect square images preferred
+    preferredAspectRatio: [0.9, 1.1], // Nearly perfect square images only
+    strictSquareOnly: true, // STRICT: Only accept square/near-square images
     
-    // RELAXED: Background requirements disabled
-    requirePureWhiteBackground: false,
-    whiteBackgroundThreshold: 0.3, // Very lenient background check
+    // CLEAN BACKGROUNDS: Professional product images only
+    requirePureWhiteBackground: true, // Enable clean background detection
+    whiteBackgroundThreshold: 0.75, // 75% white background required
     
-    // RELAXED: Allow watermarks temporarily
-    allowWatermarks: true,
-    watermarkDetectionThreshold: 0.8, // Very high threshold (effectively disabled)
+    // NO WATERMARKS: Professional images only
+    allowWatermarks: false, // Strict: No watermarks allowed
+    watermarkDetectionThreshold: 0.3, // Aggressive watermark detection
     
-    // Image matching requirements
-    imageMatchingThreshold: 0.7, // 70% confidence required
+    // Image matching requirements - SMART SEARCH-BASED MATCHING
+    imageMatchingThreshold: 0.70, // 70% minimum confidence required
+    preferBrandedImages: true, // Prioritize brand-specific matches
+    perfectMatchThreshold: 0.95, // 95% for perfect matches
     
-    // File requirements - adjusted for 600-1200px images
-    minFileSize: 50000, // 50KB minimum (higher quality images)
-    maxFileSize: 8000000, // 8MB maximum (accommodate larger images)
+    // File requirements - HIGH QUALITY FILES ONLY
+    minFileSize: 80000, // 80KB minimum (high quality images only)
+    maxFileSize: 8000000, // 8MB maximum (accommodate high-res images)
     allowedFormats: ['jpg', 'jpeg', 'png'],
     
-    // Sharpness requirements
-    minSharpness: 0.3 // 30% minimum sharpness
+    // Sharpness requirements - CRISP IMAGES ONLY
+    minSharpness: 0.5 // 50% minimum sharpness for professional quality
   },
 
-  // Download Settings
+  // Download Settings - MAXIMUM SPEED
   download: {
-    concurrentDownloads: 5, // Increased for faster parallel downloads
-    downloadTimeout: 15000, // Reduced timeout for faster failure detection
-    retryAttempts: 2, // Reduced retries for speed
-    backoffMultiplier: 1.5 // Faster backoff
+    concurrentDownloads: 10, // Increased to 10 for maximum parallel downloads
+    downloadTimeout: 8000, // Reduced to 8 seconds for faster failure detection
+    retryAttempts: 1, // Only 1 retry for maximum speed
+    backoffMultiplier: 1.2 // Minimal backoff
   },
 
   // File System Settings

@@ -11,6 +11,7 @@ const pixelmatch = require('pixelmatch');
 const Logger = require('../utils/logger');
 const Helpers = require('../utils/helpers');
 const config = require('../config/settings');
+const BrandWebsiteScraper = require('./brandWebsiteScraper');
 
 /**
  * Image Search class for finding product images
@@ -26,6 +27,7 @@ class ImageSearch {
     this.imageHashes = new Set(); // Store image hashes for duplicate detection
     this.userAgents = this.initUserAgents(); // User agent rotation for anti-detection
     this.currentUserAgentIndex = 0;
+    this.brandScraper = new BrandWebsiteScraper(Logger, config); // Official brand website scraper
   }
 
   /**
@@ -133,8 +135,16 @@ class ImageSearch {
           '--disable-gpu',
           '--disable-web-security',
           '--disable-features=VizDisplayCompositor',
-          '--disable-blink-features=AutomationControlled'
-        ]
+          '--disable-blink-features=AutomationControlled',
+          '--disable-extensions',
+          '--disable-plugins',
+          '--disable-images', // Speed optimization: don't load images
+          '--disable-javascript', // Speed optimization: disable JS where possible
+          '--disable-css', // Speed optimization: disable CSS rendering
+          '--memory-pressure-off',
+          '--max_old_space_size=4096'
+        ],
+        timeout: 10000 // Faster browser startup timeout
       });
       Logger.info('Browser initialized for advanced search');
     }
@@ -153,11 +163,63 @@ class ImageSearch {
         brand: product.brand 
       });
 
+      let allImageUrls = [];
+      
+      // PRIORITY 1: Search official brand website FIRST (Highest Quality & Authenticity)
+      if (product.brand && product.brand !== 'NONE') {
+        try {
+          Logger.info(`🏢 PRIORITY: Searching official ${product.brand} website first`, {
+            itemId: product.itemid,
+            brand: product.brand
+          });
+          
+          const brandImages = await this.brandScraper.searchBrandWebsite(product.name, product.brand);
+          if (brandImages && brandImages.length > 0) {
+            allImageUrls = allImageUrls.concat(brandImages);
+            Logger.success(`🏢 Found ${brandImages.length} images from official ${product.brand} website`, {
+              itemId: product.itemid,
+              brand: product.brand,
+              count: brandImages.length
+            });
+            
+            // If we found enough high-quality images from brand website, we might not need other sources
+            if (brandImages.length >= config.search.maxImagesPerItem) {
+              Logger.info(`🏢 Sufficient images found from brand website, skipping other sources`, {
+                itemId: product.itemid,
+                brand: product.brand
+              });
+              
+              const uniqueUrls = [...new Set(allImageUrls)];
+              const filteredUrls = this.filterImageUrls(uniqueUrls);
+              const limitedUrls = filteredUrls.slice(0, config.search.maxImagesPerItem);
+              
+              Logger.success('Brand website search completed', { 
+                itemId: product.itemid,
+                totalFound: allImageUrls.length,
+                finalCount: limitedUrls.length,
+                source: 'Official Brand Website'
+              });
+              
+              return limitedUrls;
+            }
+          }
+        } catch (error) {
+          Logger.warn(`Brand website search failed for ${product.brand}`, { 
+            itemId: product.itemid,
+            error: error.message 
+          });
+        }
+      }
+
+      // PRIORITY 2: Fallback to search engines if needed
+      Logger.info('Complementing with search engine results', { 
+        itemId: product.itemid,
+        brandImagesFound: allImageUrls.length
+      });
+
       // Generate search queries
       const queries = Helpers.generateSearchQueries(product);
       product.searchQueries = queries;
-
-      let allImageUrls = [];
       
       // Search with each query across enabled engines
       for (const query of queries) {
@@ -324,10 +386,10 @@ class ImageSearch {
         await page.setUserAgent(config.search.userAgent);
         // Amazon search URL (default to .com, can be adjusted for region)
         const searchUrl = `https://www.amazon.com/s?k=${encodeURIComponent(query)}`;
-        await page.goto(searchUrl, { waitUntil: 'networkidle0', timeout: 30000 });
+        await page.goto(searchUrl, { waitUntil: 'domcontentloaded', timeout: config.search.searchTimeout });
 
         // Wait for product results to load
-        await page.waitForSelector('div.s-main-slot', { timeout: 10000 });
+        await page.waitForSelector('div.s-main-slot', { timeout: config.search.selectorTimeout });
 
         // Extract image URLs from product listings
         const imageUrls = await page.evaluate(() => {
@@ -423,7 +485,7 @@ class ImageSearch {
         await page.setUserAgent(config.search.userAgent);
         // MrDIY Malaysia search URL
         const searchUrl = `https://mrdiy.com.my/search?q=${encodeURIComponent(query)}`;
-        await page.goto(searchUrl, { waitUntil: 'networkidle0', timeout: 30000 });
+        await page.goto(searchUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
         // Extract image URLs from product listings
         const imageUrls = await page.evaluate(() => {
@@ -465,7 +527,7 @@ class ImageSearch {
         await page.setUserAgent(config.search.userAgent);
         // Ace Hardware search URL
         const searchUrl = `https://www.acehardware.com/search?query=${encodeURIComponent(query)}`;
-        await page.goto(searchUrl, { waitUntil: 'networkidle0', timeout: 30000 });
+        await page.goto(searchUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
         // Extract image URLs from product listings
         const imageUrls = await page.evaluate(() => {
@@ -505,7 +567,7 @@ class ImageSearch {
         await page.setUserAgent(config.search.userAgent);
         // Home Depot search URL
         const searchUrl = `https://www.homedepot.com/s/${encodeURIComponent(query)}`;
-        await page.goto(searchUrl, { waitUntil: 'networkidle0', timeout: 30000 });
+        await page.goto(searchUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
         // Extract image URLs from product listings
         const imageUrls = await page.evaluate(() => {
@@ -547,7 +609,7 @@ class ImageSearch {
       
       try {
         await page.setUserAgent(config.search.userAgent);
-        await page.goto(searchUrl, { waitUntil: 'networkidle0', timeout: 30000 });
+        await page.goto(searchUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
         
         // Extract image URLs from the page
         const imageUrls = await page.evaluate(() => {
@@ -624,7 +686,7 @@ class ImageSearch {
         await this.configurePageForSearch(page);
         
         const searchUrl = `https://shopee.com.my/search?keyword=${encodeURIComponent(query)}`;
-        await page.goto(searchUrl, { waitUntil: 'networkidle2', timeout: 45000 });
+        await page.goto(searchUrl, { waitUntil: 'domcontentloaded', timeout: config.search.searchTimeout });
         
         // Wait with multiple fallback selectors
         const selectors = [
@@ -697,7 +759,7 @@ class ImageSearch {
         await this.configurePageForSearch(page);
         
         const searchUrl = `https://www.lazada.com.my/catalog/?q=${encodeURIComponent(query)}`;
-        await page.goto(searchUrl, { waitUntil: 'networkidle2', timeout: 45000 });
+        await page.goto(searchUrl, { waitUntil: 'domcontentloaded', timeout: config.search.searchTimeout });
         
         // Multiple fallback selectors for Lazada
         const selectors = [
@@ -772,7 +834,7 @@ class ImageSearch {
         await this.configurePageForSearch(page);
         
         const searchUrl = `https://www.ebay.com/sch/i.html?_nkw=${encodeURIComponent(query)}`;
-        await page.goto(searchUrl, { waitUntil: 'networkidle2', timeout: 45000 });
+        await page.goto(searchUrl, { waitUntil: 'domcontentloaded', timeout: config.search.searchTimeout });
         
         // Multiple selectors for eBay items
         const selectors = [
@@ -1275,6 +1337,11 @@ class ImageSearch {
       await this.browser.close();
       this.browser = null;
       Logger.info('Browser closed');
+    }
+    
+    // Cleanup brand website scraper
+    if (this.brandScraper) {
+      await this.brandScraper.cleanup();
     }
     
     // Clear duplicate detection caches

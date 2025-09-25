@@ -77,10 +77,9 @@ class DownloadManager {
       // Ensure output directory exists
       await fs.ensureDir(outputDir);
 
-      const downloadPromises = imageUrls.slice(0, config.search.maxImagesPerItem)
-        .map((url, index) => this.downloadSingleImage(url, outputDir, product.itemid, index + 1));
-
-  const results = await Promise.allSettled(downloadPromises);
+      // Process downloads in optimized chunks for maximum speed
+      const imagesToDownload = imageUrls.slice(0, config.search.maxImagesPerItem);
+      const results = await this.processDownloadsInChunks(imagesToDownload, outputDir, product.itemid);
       
       // Process results
       const downloadResult = {
@@ -99,11 +98,12 @@ class DownloadManager {
       for (let i = 0; i < results.length; i++) {
         const result = results[i];
         if (result.status === 'fulfilled' && result.value && result.value.success) {
-          // Validate image-product match on the saved file
+          // Validate image-product match with brand information
           const validation = await this.imageValidator.validateImageMatch(
             result.value.filePath,
             product.name,
-            product.itemid
+            product.itemid,
+            product.brand // Include brand for enhanced matching
           );
 
           downloadResult.validationResults.push({
@@ -125,16 +125,25 @@ class DownloadManager {
         }
       }
 
-      // Calculate average confidence
+      // Calculate confidence metrics
       const avgConfidence = validImageCount > 0 ? totalConfidence / validImageCount : 0;
-  downloadResult.averageConfidence = avgConfidence;
-  downloadResult.needsNSFolder = avgConfidence < 0.7;
-  // expose for later folder rename step
-  product.imageMatchingConfidence = avgConfidence;
+      const perfectMatches = downloadResult.validationResults.filter(v => v.confidence >= 1.0).length;
+      const highConfidenceMatches = downloadResult.validationResults.filter(v => v.confidence >= 0.7).length;
+      
+      downloadResult.averageConfidence = avgConfidence;
+      downloadResult.perfectMatches = perfectMatches;
+      downloadResult.highConfidenceMatches = highConfidenceMatches;
+      downloadResult.needsNSFolder = avgConfidence < 0.7;
+      
+      // expose for later folder rename step
+      product.imageMatchingConfidence = avgConfidence;
+      product.perfectMatches = perfectMatches;
 
       Logger.info('Product download completed', {
         ...downloadResult,
-        averageConfidence: (avgConfidence * 100).toFixed(1) + '%'
+        averageConfidence: (avgConfidence * 100).toFixed(1) + '%',
+        perfectMatches: perfectMatches,
+        highConfidenceMatches: `${highConfidenceMatches}/${validImageCount}`
       });
       
       return downloadResult;
@@ -459,6 +468,37 @@ class DownloadManager {
     
     this.qualityAnalyzer.clearCache();
     Logger.info('Download manager cleaned up');
+  }
+
+  /**
+   * Process downloads in optimized chunks for maximum speed
+   * @param {Array} imageUrls - Array of image URLs to download
+   * @param {string} outputDir - Output directory path
+   * @param {string} itemId - Item ID for logging
+   * @returns {Promise<Array>} Array of download results
+   */
+  async processDownloadsInChunks(imageUrls, outputDir, itemId) {
+    const chunkSize = config.download.concurrentDownloads;
+    const results = [];
+    
+    // Process in chunks to avoid overwhelming the system
+    for (let i = 0; i < imageUrls.length; i += chunkSize) {
+      const chunk = imageUrls.slice(i, i + chunkSize);
+      const chunkPromises = chunk.map((url, index) => 
+        this.downloadSingleImage(url, outputDir, itemId, i + index + 1)
+      );
+      
+      // Process chunk in parallel
+      const chunkResults = await Promise.allSettled(chunkPromises);
+      results.push(...chunkResults);
+      
+      // Small delay between chunks to prevent rate limiting (minimal)
+      if (i + chunkSize < imageUrls.length) {
+        await new Promise(resolve => setTimeout(resolve, 50)); // 50ms delay
+      }
+    }
+    
+    return results;
   }
 }
 

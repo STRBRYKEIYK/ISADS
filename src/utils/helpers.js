@@ -40,18 +40,11 @@ class Helpers {
     const { name, brand } = product;
     
     if (name && brand) {
-      // Primary search only: Product Name + Brand (most effective)
-      queries.push(`"${name}" "${brand}"`);
-      queries.push(`${name} ${brand}`);
-      
-      // Only add one fallback for speed
-      const productType = this.extractProductType(name);
-      if (productType) {
-        queries.push(`${brand} ${productType}`);
-      }
+      // SPEED OPTIMIZED: Only most effective search patterns
+      queries.push(`"${name}" "${brand}"`); // Most precise search only
+      queries.push(`${name} ${brand}`); // Basic fallback only
     } else if (name) {
-      queries.push(`"${name}"`);
-      queries.push(`${name}`);
+      queries.push(`"${name}"`); // Single precise search
     }
     
     return queries;
