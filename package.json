@@ -1,0 +1,45 @@
+{
+  "name": "product-image-search-download",
+  "version": "1.0.0",
+  "description": "Automated system that reads product data from Excel files and downloads matching product images with quality filtering",
+  "main": "src/main.js",
+  "scripts": {
+    "start": "node src/main.js",
+    "dev": "node --inspect src/main.js",
+    "test": "jest",
+    "lint": "eslint src/**/*.js",
+    "download": "node src/main.js --input products.xlsx --output \"Item Images\""
+  },
+  "keywords": [
+    "product-images",
+    "excel",
+    "web-scraping",
+    "image-download",
+    "automation"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.12.2",
+    "cheerio": "^1.1.2",
+    "commander": "^14.0.1",
+    "form-data": "^4.0.4",
+    "fs-extra": "^11.3.2",
+    "image-hash": "^5.3.2",
+    "jimp": "^1.6.0",
+    "natural": "^8.1.0",
+    "pixelmatch": "^7.1.0",
+    "puppeteer": "^24.22.3",
+    "sharp": "^0.34.4",
+    "string-similarity": "^4.0.4",
+    "winston": "^3.17.0",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "eslint": "^9.36.0",
+    "jest": "^30.1.3"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
