@@ -13,10 +13,11 @@ class ImageValidator {
         this.logger = logger;
         this.processedHashes = new Set();
         this.similarImages = new Map();
-        this.duplicateThreshold = 0.9; // 90% similarity for duplicates
-        this.matchThreshold = 0.70; // 70% minimum confidence threshold
-        this.perfectMatchThreshold = 1.0; // 100% match target
-        this.brandMatchWeight = 0.40; // Increased brand matching importance
+    const config = require('../config/settings');
+    this.duplicateThreshold = config.quality.duplicateThreshold || 0.9;
+    this.matchThreshold = config.quality.imageMatchingThreshold || 0.70;
+    this.perfectMatchThreshold = config.quality.perfectMatchThreshold || 1.0;
+    this.brandMatchWeight = 0.40; // Increased brand matching importance
     }
 
     /**

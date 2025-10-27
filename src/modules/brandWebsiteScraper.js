@@ -54,19 +54,23 @@ class BrandWebsiteScraper {
                 return [];
             }
 
-            const brandKey = brandName.toUpperCase();
+            // Normalize Unicode for product and brand names
+            const normProductName = productName ? productName.toString().normalize('NFC') : '';
+            const normBrandName = brandName ? brandName.toString().normalize('NFC') : '';
+
+            const brandKey = normBrandName.toUpperCase();
             const brandConfig = brandWebsites[brandKey];
-            
+
             if (!brandConfig) {
-                this.logger.info(`🏢 No official website configuration for brand: ${brandName}`);
-                return await this.tryGenericBrandSearch(productName, brandName);
+                this.logger.info(`f3e2 No official website configuration for brand: ${normBrandName}`);
+                return await this.tryGenericBrandSearch(normProductName, normBrandName);
             }
 
-            this.logger.info(`🏢 Searching official ${brandName} website for: ${productName}`);
-            
+            this.logger.info(`f3e2 Searching official ${normBrandName} website for: ${normProductName}`);
+
             const browser = await this.initializeBrowser();
             const page = await browser.newPage();
-            
+
             // Set user agent and viewport
             await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
             await page.setViewport({ width: 1920, height: 1080 });
@@ -75,21 +79,21 @@ class BrandWebsiteScraper {
 
             switch (brandConfig.searchMethod) {
                 case 'path':
-                    imageUrls = await this.searchByPath(page, brandConfig, productName);
+                    imageUrls = await this.searchByPath(page, brandConfig, normProductName);
                     break;
                 case 'query':
-                    imageUrls = await this.searchByQuery(page, brandConfig, productName);
+                    imageUrls = await this.searchByQuery(page, brandConfig, normProductName);
                     break;
                 case 'menu_scan':
-                    imageUrls = await this.searchMenuItems(page, brandConfig, productName);
+                    imageUrls = await this.searchMenuItems(page, brandConfig, normProductName);
                     break;
                 default:
-                    imageUrls = await this.searchByQuery(page, brandConfig, productName);
+                    imageUrls = await this.searchByQuery(page, brandConfig, normProductName);
             }
 
             await page.close();
-            
-            this.logger.info(`🏢 Found ${imageUrls.length} images from ${brandName} official website`);
+
+            this.logger.info(`f3e2 Found ${imageUrls.length} images from ${normBrandName} official website`);
             return imageUrls;
 
         } catch (error) {

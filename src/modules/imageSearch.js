@@ -40,7 +40,7 @@ class ImageSearch {
       headers: {
         'User-Agent': config.search.userAgent,
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
+        'Accept-Language': config.search.acceptLanguage || 'en-US,en;q=0.5',
         'Accept-Encoding': 'gzip, deflate',
         'Connection': 'keep-alive',
         'Cache-Control': 'no-cache'

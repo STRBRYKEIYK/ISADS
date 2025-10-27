@@ -1,4 +1,4 @@
-Item ID,Name,Brand
+Item ID,Item Name,Brand
 1,Acetylene Cutting Tip 2NX (HARRIS),Harris
 2,Acetylene Cutting Tip 6290-2 (HARRIS),Harris
 3,Acetylene Cutting Tip 6290-3 (HARRIS),Harris
@@ -253,3 +253,6 @@ Item ID,Name,Brand
 252,Rags,NONE
 253,Chalk,NONE
 254,Chalk Stone,None
+255,"Allen Bolt 3/8"" x 1"" NC (FT)",NONE
+256,"Hexagonal Bolt, 3/8"" x 1"" NC (FT)",
+257,"Allen Bolt 1/4"" x 1"" NC (FT)",NONE

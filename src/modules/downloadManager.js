@@ -184,25 +184,20 @@ class DownloadManager {
    * Process download queue with concurrency control
    */
   async processQueue() {
-    if (this.activeDownloads >= config.download.concurrentDownloads || this.downloadQueue.length === 0) {
-      return;
-    }
-
-    const download = this.downloadQueue.shift();
-    this.activeDownloads++;
-
-    try {
-      const result = await Helpers.retry(
+    while (this.activeDownloads < config.download.concurrentDownloads && this.downloadQueue.length > 0) {
+      const download = this.downloadQueue.shift();
+      this.activeDownloads++;
+      Helpers.retry(
         () => this.downloadSingleImage(download.url, download.outputDir, download.itemId, download.imageIndex),
         config.download.retryAttempts
-      );
-      download.resolve(result);
-    } catch (error) {
-      download.reject(error);
-    } finally {
-      this.activeDownloads--;
-      // Process next item in queue
-      setImmediate(() => this.processQueue());
+      ).then(result => {
+        download.resolve(result);
+      }).catch(error => {
+        download.reject(error);
+      }).finally(() => {
+        this.activeDownloads--;
+        setImmediate(() => this.processQueue());
+      });
     }
   }
 
@@ -319,6 +314,27 @@ class DownloadManager {
       this.itemImageCounts.set(itemId, currentCount + 1);
       this.stats.successful++;
 
+      // Store image metadata
+      const metadataPath = path.join(outputDir, 'metadata.json');
+      let metadata = [];
+      if (fs.existsSync(metadataPath)) {
+        try {
+          metadata = JSON.parse(fs.readFileSync(metadataPath));
+        } catch (e) {
+          metadata = [];
+        }
+      }
+      metadata.push({
+        fileName: filename,
+        url,
+        downloadDate: new Date().toISOString(),
+        qualityScore: qualityAnalysis.score,
+        dimensions: qualityAnalysis.dimensions,
+        backgroundConfidence: qualityAnalysis.backgroundConfidence,
+        hasWatermark: qualityAnalysis.hasWatermark
+      });
+      fs.writeFileSync(metadataPath, JSON.stringify(metadata, null, 2));
+
       return {
         success: true,
         filePath,
@@ -350,11 +366,19 @@ class DownloadManager {
         baseOutputDir
       });
 
+      // Add CLI progress bar
+      const cliProgress = require('cli-progress');
+      const bar = new cliProgress.SingleBar({
+        format: 'Downloading |{bar}| {percentage}% | {value}/{total} Products',
+        barCompleteChar: '\u2588',
+        barIncompleteChar: '\u2591',
+        hideCursor: true
+      });
+      bar.start(products.length, 0);
+
       const results = [];
-      
       for (let i = 0; i < products.length; i++) {
         const product = products[i];
-        
         try {
           // Create product-specific directory
           const productDir = path.join(baseOutputDir, Helpers.sanitizeFilename(product.itemid));
@@ -379,27 +403,18 @@ class DownloadManager {
           if (i < products.length - 1) {
             await Helpers.sleep(1000);
           }
-        } catch (error) {
-          Logger.error('Product download failed', {
-            itemId: product.itemid,
-            error
-          });
-          
-          results.push({
-            itemId: product.itemid,
-            attempted: 0,
-            downloaded: 0,
-            failed: 1,
-            errors: [{ error: error.message }]
-          });
+        } catch (err) {
+          Logger.error('Download failed for product', { itemid: product.itemid, error: err.message });
+          results.push({ itemid: product.itemid, error: err.message });
         }
+        bar.update(i + 1);
+        if (progressCallback) progressCallback(i + 1, products.length);
       }
-
+      bar.stop();
       Logger.success('Batch download completed', {
         totalProducts: products.length,
         stats: this.getStats()
       });
-
       return results;
     } catch (error) {
       Logger.error('Batch download process failed', error);

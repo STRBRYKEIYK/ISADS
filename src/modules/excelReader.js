@@ -183,11 +183,17 @@ class ExcelReader {
     try {
       const product = {};
 
-      // Extract required fields
+      // Extract required fields with Unicode normalization
       for (const [columnName, columnIndex] of Object.entries(columnMap)) {
-        const value = row[columnIndex];
-        product[columnName.toLowerCase().replace(' ', '')] = 
-          value ? value.toString().trim() : '';
+        let value = row[columnIndex];
+        if (value) {
+          value = value.toString().trim();
+          // Normalize Unicode (NFC)
+          value = value.normalize('NFC');
+        } else {
+          value = '';
+        }
+        product[columnName.toLowerCase().replace(' ', '')] = value;
       }
 
       // Validate essential fields

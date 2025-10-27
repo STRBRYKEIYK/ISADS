@@ -105,5 +105,15 @@ module.exports = {
     logFile: 'logs/product-image-download.log',
     maxLogSize: '20m',
     maxLogFiles: 5
+  },
+
+  // Cloud Storage Settings (Optional)
+  cloud: {
+    enableS3: false, // Set true to enable S3 uploads
+    awsAccessKeyId: '',
+    awsSecretAccessKey: '',
+    awsRegion: 'us-east-1',
+    s3Bucket: '',
+    s3BasePath: 'item-images/'
   }
 };

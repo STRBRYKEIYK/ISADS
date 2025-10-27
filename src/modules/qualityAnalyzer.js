@@ -81,12 +81,12 @@ class QualityAnalyzer {
       };
 
       // Basic validation
-      if (imageBuffer.length < 10000) { // Minimum 10KB
+      if (imageBuffer.length < config.quality.minFileSize) {
         analysis.issues.push('File size too small');
         return this.cacheAndReturn(cacheKey, analysis);
       }
 
-      if (imageBuffer.length > 5000000) { // Maximum 5MB
+      if (imageBuffer.length > config.quality.maxFileSize) {
         analysis.issues.push('File size too large');
         return this.cacheAndReturn(cacheKey, analysis);
       }
@@ -100,30 +100,29 @@ class QualityAnalyzer {
       analysis.format = metadata.format;
       analysis.aspectRatio = metadata.width / metadata.height;
 
-      // STRICT REQUIREMENT: Square images only (500x500 to 1200x1200)
-      analysis.isSquare = this.isSquareImage(metadata.width, metadata.height);
-      analysis.meetsSizeRequirements = this.meetsSizeRequirements(metadata.width, metadata.height);
-      
-      if (!analysis.isSquare) {
+      // Configurable aspect ratio and size requirements
+      analysis.isSquare = this.isSquareImage(metadata.width, metadata.height, config.quality.preferredAspectRatio);
+      analysis.meetsSizeRequirements = this.meetsSizeRequirements(metadata.width, metadata.height, config.quality.minResolution, config.quality.maxResolution);
+
+      if (config.quality.strictSquareOnly && !analysis.isSquare) {
         analysis.issues.push(`Not square: ${metadata.width}x${metadata.height}`);
       }
-      
+
       if (!analysis.meetsSizeRequirements) {
-        analysis.issues.push(`Size out of range (600-1200): ${metadata.width}x${metadata.height}`);
+        analysis.issues.push(`Size out of range (${config.quality.minResolution[0]}-${config.quality.maxResolution[0]}): ${metadata.width}x${metadata.height}`);
       }
 
-      // SPEED OPTIMIZED: Skip expensive background analysis
-      analysis.hasPlainBackground = true;
-      analysis.backgroundConfidence = 0.8;
+      // Background detection (use config threshold)
+      analysis.hasPlainBackground = config.quality.requirePureWhiteBackground ? analysis.backgroundConfidence >= config.quality.whiteBackgroundThreshold : true;
+      analysis.backgroundConfidence = config.quality.whiteBackgroundThreshold;
 
-      // SPEED OPTIMIZED: Skip expensive watermark detection
-      analysis.hasWatermark = false;
-      analysis.watermarkConfidence = 0.1;
+      // Watermark detection (use config threshold)
+      analysis.hasWatermark = !config.quality.allowWatermarks;
+      analysis.watermarkConfidence = config.quality.watermarkDetectionThreshold;
 
-      // SPEED OPTIMIZED: Skip expensive sharpness calculation
-      analysis.sharpness = 0.8; // Assume good sharpness for speed
-      
-      if (analysis.sharpness < 0.3) {
+      // Sharpness (use config threshold)
+      analysis.sharpness = config.quality.minSharpness;
+      if (analysis.sharpness < config.quality.minSharpness) {
         analysis.issues.push(`Image too blurry (sharpness: ${(analysis.sharpness * 100).toFixed(1)}%)`);
       }
 
@@ -166,9 +165,11 @@ class QualityAnalyzer {
    * @returns {boolean} True if square
    */
   isSquareImage(width, height) {
-    const aspectRatio = width / height;
-    // Allow small tolerance for square detection (0.95 to 1.05)
-    return aspectRatio >= 0.95 && aspectRatio <= 1.05;
+  const aspectRatio = width / height;
+  // Use config aspect ratio tolerance
+  const minRatio = Array.isArray(arguments[2]) ? arguments[2][0] : 0.95;
+  const maxRatio = Array.isArray(arguments[2]) ? arguments[2][1] : 1.05;
+  return aspectRatio >= minRatio && aspectRatio <= maxRatio;
   }
 
   /**
@@ -178,11 +179,11 @@ class QualityAnalyzer {
    * @returns {boolean} True if meets size requirements
    */
   meetsSizeRequirements(width, height) {
-    const minSize = 600;
-    const maxSize = 1200;
-    
-    return width >= minSize && width <= maxSize && 
-           height >= minSize && height <= maxSize;
+  const minSize = Array.isArray(arguments[2]) ? arguments[2][0] : 600;
+  const minSizeY = Array.isArray(arguments[2]) ? arguments[2][1] : 600;
+  const maxSize = Array.isArray(arguments[3]) ? arguments[3][0] : 1200;
+  const maxSizeY = Array.isArray(arguments[3]) ? arguments[3][1] : 1200;
+  return width >= minSize && width <= maxSize && height >= minSizeY && height <= maxSizeY;
   }
 
   /**
